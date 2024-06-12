@@ -1,16 +1,16 @@
-mod gameboardimpl;
-use gameboardimpl::GameBoardImpl;
+mod game_board_impl;
+use game_board_impl::GameBoardImpl;
 
 pub trait GameBoard {
-    type Index;
-    type Cell: CellHandle;
-    fn get(&mut self, index: Self::Index) -> &mut Self::Cell;
+    type Index: Copy;
+    type Entry: BoardEntry;
+    fn entry(&mut self, index: Self::Index) -> &mut Self::Entry;
     fn adjacent(&self, index: Self::Index) -> [Self::Index; 8];
     fn traverse<S: Strategy>(&mut self, idx: Self::Index, strategy: S) -> Option<Self::Index>;
     fn make_move(
         &mut self,
         index: Self::Index,
-        player: CellPlayer<Self::Cell>,
+        player: CellPlayer<Self::Entry>,
     ) -> Result<(), GameCoreError> {
         GameBoardImpl { board: self }.make_move(index, player)
     }
@@ -22,10 +22,10 @@ pub trait GameBoard {
     }
 }
 type BoardIndex<B> = <B as GameBoard>::Index;
-type BoardCell<B> = <B as GameBoard>::Cell;
+type BoardCell<B> = <B as GameBoard>::Entry;
 
-pub trait CellHandle {
-    type Player;
+pub trait BoardEntry {
+    type Player: Copy + PartialEq;
     fn get_type(&self) -> CellType;
     fn set_type(&mut self, new_type: CellType);
     fn get_player(&self) -> Self::Player;
@@ -47,16 +47,18 @@ pub enum CellType {
     Filled,
     Border,
 }
+
+#[derive(PartialEq, Eq)]
 pub enum CellState {
     Dead,
     Alive,
     NearAnchor,
     Between,
 }
-type CellPlayer<C> = <C as CellHandle>::Player;
+type CellPlayer<C> = <C as BoardEntry>::Player;
 
 pub trait Strategy: detail::Sealed {
-    type Board: GameBoard;
+    type Board: GameBoard + ?Sized;
     fn is_traversed(&self, cell: &BoardCell<Self::Board>) -> bool;
     fn process(
         &self,
