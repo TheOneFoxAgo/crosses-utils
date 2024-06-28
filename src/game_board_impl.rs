@@ -15,29 +15,36 @@ impl<B: GameBoard + ?Sized> GameBoardImpl<'_, B> {
             CellType::Empty(empty) => {
                 if empty.is_active(player) {
                     entry.cross_out(player);
-                    self.board.adjacent(index).into_iter().for_each(|i| {
-                        let entry = self.board.entry(i);
+                    for adjacent in self.board.adjacent(index) {
+                        let entry = self.board.entry(adjacent);
                         match entry.get_type() {
-                            CellType::Empty(mut empty) => {
-                                empty.activate(player);
-                            }
-                            CellType::Cross(mut cross) if (cross.get_player() != player) => {
-                                cross.activate(player);
-                            }
+                            CellType::Empty(mut empty) => empty.activate(player),
+                            CellType::Cross(mut cross) => cross.activate(player),
                             CellType::Filled(filled) => {
                                 if filled.get_player() == player {
                                     if !filled.is_alive() {
-                                        // self.board.revive(i, )
-                                        // self.board.traverse(i, Activate::<B> { player });
-                                        // self.board.entry(index).set_anchor();
-                                        // self.board.entry(i).set_state(CellState::NearAnchor);
-                                        todo!();
+                                        self.board.revive(adjacent, |cell_type| match cell_type {
+                                            CellType::Empty(mut empty) => empty.activate(player),
+                                            CellType::Cross(mut cross) => cross.activate(player),
+                                            CellType::Filled(mut filled) => filled.set_alive(true),
+                                            _ => {}
+                                        });
+                                        if let CellType::Cross(mut cross) =
+                                            self.board.entry(index).get_type()
+                                        {
+                                            cross.set_anchor(true);
+                                        }
+                                        if let CellType::Filled(mut filled) =
+                                            self.board.entry(adjacent).get_type()
+                                        {
+                                            filled.set_important(true);
+                                        }
                                     }
                                 }
                             }
                             _ => {}
                         }
-                    });
+                    }
                     Ok(())
                 } else {
                     Err(GameCoreError::OutOfReach)
