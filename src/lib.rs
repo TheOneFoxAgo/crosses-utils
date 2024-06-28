@@ -89,6 +89,7 @@ pub mod cell_type {
 
 pub enum GameCoreError {
     SelfFill,
+    DoubleFill,
     BorderHit,
     OutOfReach,
 }
