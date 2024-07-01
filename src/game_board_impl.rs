@@ -1,22 +1,22 @@
 use crate::cell_type::*;
 use crate::*;
 
-pub struct GameBoardImpl<'a, B: GameBoard + ?Sized> {
+pub struct GameBoardImpl<'a, B: GameBoard> {
     pub board: &'a mut B,
 }
-impl<B: GameBoard + ?Sized> GameBoardImpl<'_, B> {
+impl<B: GameBoard> GameBoardImpl<'_, B> {
     pub fn make_move(
         &mut self,
         index: BoardIndex<B>,
         player: EntryPlayer<BoardCell<B>>,
     ) -> Result<(), GameCoreError> {
-        let entry = self.board.entry(index);
+        let mut entry = self.board.entry(index);
         match entry.get_type() {
             CellType::Empty(empty) => {
                 if empty.is_active(player) {
                     entry.cross_out(player);
                     for adjacent in self.board.adjacent(index) {
-                        let entry = self.board.entry(adjacent);
+                        let mut entry = self.board.entry(adjacent);
                         match entry.get_type() {
                             CellType::Empty(mut empty) => empty.activate(player),
                             CellType::Cross(mut cross) => cross.activate(player),
@@ -46,7 +46,7 @@ impl<B: GameBoard + ?Sized> GameBoardImpl<'_, B> {
                     // TODO: Finish deactivation (Wish me luck);
                     entry.fill(player);
                     for adjacent in self.board.adjacent(index) {
-                        let entry = self.board.entry(adjacent);
+                        let mut entry = self.board.entry(adjacent);
                         match entry.get_type() {
                             CellType::Empty(mut empty) => empty.activate(player),
                             CellType::Cross(mut cross) => cross.activate(player),
@@ -91,6 +91,8 @@ impl<B: GameBoard + ?Sized> GameBoardImpl<'_, B> {
     ) {
         if let CellType::Empty(emtpy) = self.board.entry(index).get_type() {
             action(emtpy);
+        } else {
+            unreachable!();
         }
     }
     fn if_cross(
@@ -100,6 +102,8 @@ impl<B: GameBoard + ?Sized> GameBoardImpl<'_, B> {
     ) {
         if let CellType::Cross(cross) = self.board.entry(index).get_type() {
             action(cross);
+        } else {
+            unreachable!();
         }
     }
     fn if_filled(
@@ -109,6 +113,8 @@ impl<B: GameBoard + ?Sized> GameBoardImpl<'_, B> {
     ) {
         if let CellType::Filled(filled) = self.board.entry(index).get_type() {
             action(filled);
+        } else {
+            unreachable!();
         }
     }
 }

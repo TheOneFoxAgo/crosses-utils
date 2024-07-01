@@ -1,17 +1,17 @@
 mod game_board_impl;
 use game_board_impl::GameBoardImpl;
 
-pub trait GameBoard {
+pub trait GameBoard: Sized {
     type Index: Copy;
     type Entry: BoardEntry;
-    fn entry(&mut self, index: Self::Index) -> &mut Self::Entry;
+    fn entry(&mut self, index: Self::Index) -> Self::Entry;
     fn adjacent(&self, index: Self::Index) -> [Self::Index; 8];
-    fn revive(&mut self, index: Self::Index, revive: impl Fn(EntryType<Self::Entry>));
-    fn kill(&mut self, index: Self::Index, kill: impl Fn(EntryType<Self::Entry>));
+    fn revive(&mut self, index: Self::Index, revive: impl Fn(CellType<Self::Entry>));
+    fn kill(&mut self, index: Self::Index, kill: impl Fn(CellType<Self::Entry>));
     fn search(
         &mut self,
         index: Self::Index,
-        search: impl Fn(EntryType<Self::Entry>) -> core::ops::ControlFlow<Self::Index>,
+        search: impl Fn(CellType<Self::Entry>) -> core::ops::ControlFlow<Self::Index>,
     ) -> Option<Self::Index>;
     fn make_move(
         &mut self,
@@ -29,35 +29,24 @@ pub trait GameBoard {
 }
 type BoardIndex<B> = <B as GameBoard>::Index;
 type BoardCell<B> = <B as GameBoard>::Entry;
-type EntryType<E> = CellType<
-    <E as BoardEntry>::Empty,
-    <E as BoardEntry>::Cross,
-    <E as BoardEntry>::Filled,
-    <E as BoardEntry>::Player,
->;
 type EntryPlayer<E> = <E as BoardEntry>::Player;
 
-pub trait BoardEntry {
+pub trait BoardEntry: Sized {
     type Player: Copy + PartialEq;
     type Empty: cell_type::Empty<Player = Self::Player>;
     type Cross: cell_type::Cross<Player = Self::Player>;
     type Filled: cell_type::Filled<Player = Self::Player>;
-    fn get_type(&mut self) -> EntryType<Self>;
+    fn get_type(&mut self) -> CellType<Self>;
     fn cross_out(&mut self, player: Self::Player) -> Self::Cross;
     fn fill(&mut self, player: Self::Player) -> Self::Filled;
     fn remove_fill(&mut self, player: Self::Player) -> Self::Cross;
     fn remove_cross(&mut self, player: Self::Player) -> Self::Empty;
 }
 
-pub enum CellType<E, C, F, P>
-where
-    E: cell_type::Empty<Player = P>,
-    C: cell_type::Cross<Player = P>,
-    F: cell_type::Filled<Player = P>,
-{
-    Empty(E),
-    Cross(C),
-    Filled(F),
+pub enum CellType<E: BoardEntry> {
+    Empty(E::Empty),
+    Cross(E::Cross),
+    Filled(E::Filled),
     Border,
 }
 pub mod cell_type {
