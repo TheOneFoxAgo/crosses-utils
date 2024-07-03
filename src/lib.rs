@@ -1,42 +1,51 @@
-use core::cell::Cell;
 use core::ops::ControlFlow;
-pub trait Engine {
+mod engine_impl;
+
+pub trait Engine: Sized {
     type Index: Copy;
     type Data: Data;
-    fn cell(&self, index: Self::Index) -> &Cell<Self::Data>;
+    fn get(&self, index: Self::Index) -> Self::Data;
+    fn set(&mut self, index: Self::Index, data: Self::Data);
     fn adjacent(&self, index: Self::Index) -> [Self::Index; 8];
-    fn revive(&self, index: Self::Index, revive: impl Fn(Self::Index));
-    fn kill(&self, index: Self::Index, kill: impl Fn(Self::Index));
+    fn revive(&mut self, index: Self::Index, revive: impl Fn(&mut Self, Self::Index));
+    fn kill(&mut self, index: Self::Index, kill: impl Fn(&mut Self, Self::Index));
     fn search(
         &self,
         index: Self::Index,
         search: impl Fn(Self::Index) -> ControlFlow<Self::Index>,
     ) -> Option<Self::Index>;
-    fn make_move(
-        &mut self,
-        index: Self::Index,
-        player: <Self::Data as Data>::Player,
-    ) -> Result<(), GameCoreError>;
-    fn cancel_move(&mut self, index: Self::Index) -> Result<(), GameCoreError>;
-    fn init(&mut self);
+    fn moves_counter(&mut self, player: Player<Self>) -> &mut usize;
+    fn crosses_counter(&mut self, player: Player<Self>) -> &mut usize;
+    fn make_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), EngineError> {
+        engine_impl::make_move(self, index, player)
+    }
+    fn cancel_move(&mut self, index: Self::Index) -> Result<(), EngineError> {
+        engine_impl::cancel_move(self, index)
+    }
+    fn init(&mut self) {
+        engine_impl::init(self)
+    }
 }
+type Player<E> = <<E as Engine>::Data as Data>::Player;
 
 pub trait Data: Copy {
     type Player: Copy + PartialEq;
     fn kind(self) -> DataKind;
     fn player(self) -> Self::Player;
     fn previous_player(self) -> Self::Player;
-    fn is_active(self) -> bool;
-    fn set_active(self, new: bool) -> Self;
+    fn is_active(self, player: Self::Player) -> bool;
+    fn set_active(&mut self, player: Self::Player, new: bool);
+    fn is_anchor(self) -> bool;
+    fn set_anchor(&mut self, new: bool);
     fn is_important(self) -> bool;
-    fn set_important(self, new: bool) -> Self;
+    fn set_important(&mut self, new: bool);
     fn is_alive(self) -> bool;
-    fn set_alive(self, new: bool) -> Self;
+    fn set_alive(&mut self, new: bool);
 
-    fn cross_out(self, player: Self::Player) -> Self;
-    fn fill(self, player: Self::Player) -> Self;
-    fn remove_fill(self, player: Self::Player) -> Self;
-    fn remove_cross(self, player: Self::Player) -> Self;
+    fn cross_out(&mut self, player: Self::Player);
+    fn fill(&mut self, player: Self::Player);
+    fn remove_fill(&mut self, player: Self::Player);
+    fn remove_cross(&mut self, player: Self::Player);
 }
 pub enum DataKind {
     Empty,
@@ -45,7 +54,7 @@ pub enum DataKind {
     Border,
 }
 
-pub enum GameCoreError {
+pub enum EngineError {
     SelfFill,
     DoubleFill,
     BorderHit,
