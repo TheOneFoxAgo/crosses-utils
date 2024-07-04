@@ -1,4 +1,3 @@
-use core::ops::ControlFlow;
 mod engine_impl;
 
 pub trait Engine: Sized {
@@ -9,11 +8,7 @@ pub trait Engine: Sized {
     fn adjacent(&self, index: Self::Index) -> [Self::Index; 8];
     fn revive(&mut self, index: Self::Index, revive: impl Fn(&mut Self, Self::Index));
     fn kill(&mut self, index: Self::Index, kill: impl Fn(&mut Self, Self::Index));
-    fn search(
-        &self,
-        index: Self::Index,
-        search: impl Fn(Self::Index) -> ControlFlow<Self::Index>,
-    ) -> Option<Self::Index>;
+    fn search(&self, index: Self::Index) -> Option<Self::Index>;
     fn moves_counter(&mut self, player: Player<Self>) -> &mut usize;
     fn crosses_counter(&mut self, player: Player<Self>) -> &mut usize;
     fn make_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), EngineError> {
@@ -47,6 +42,7 @@ pub trait Data: Copy {
     fn remove_fill(&mut self, player: Self::Player);
     fn remove_cross(&mut self, player: Self::Player);
 }
+#[derive(PartialEq)]
 pub enum DataKind {
     Empty,
     Cross,
