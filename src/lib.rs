@@ -30,8 +30,6 @@ pub trait Data: Copy {
     fn previous_player(self) -> Self::Player;
     fn is_active(self, player: Self::Player) -> bool;
     fn set_active(&mut self, player: Self::Player, new: bool);
-    fn is_anchor(self) -> bool;
-    fn set_anchor(&mut self, new: bool);
     fn is_important(self) -> bool;
     fn set_important(&mut self, new: bool);
     fn is_alive(self) -> bool;
@@ -39,8 +37,8 @@ pub trait Data: Copy {
 
     fn cross_out(&mut self, player: Self::Player);
     fn fill(&mut self, player: Self::Player);
-    fn remove_fill(&mut self, player: Self::Player);
-    fn remove_cross(&mut self, player: Self::Player);
+    fn remove_fill(&mut self);
+    fn remove_cross(&mut self);
 }
 #[derive(PartialEq)]
 pub enum DataKind {
