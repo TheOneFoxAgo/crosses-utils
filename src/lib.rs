@@ -1,4 +1,5 @@
 mod engine_impl;
+pub mod player_manager;
 pub mod utils;
 
 pub trait Engine: Sized {
