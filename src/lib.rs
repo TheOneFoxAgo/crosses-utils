@@ -1,4 +1,5 @@
 mod engine_impl;
+pub mod utils;
 
 pub trait Engine: Sized {
     type Index: Copy;
@@ -14,11 +15,8 @@ pub trait Engine: Sized {
     fn make_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), EngineError> {
         engine_impl::make_move(self, index, player)
     }
-    fn cancel_move(&mut self, index: Self::Index) -> Result<(), EngineError> {
-        engine_impl::cancel_move(self, index)
-    }
-    fn init(&mut self) {
-        engine_impl::init(self)
+    fn cancel_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), EngineError> {
+        engine_impl::cancel_move(self, index, player)
     }
 }
 type Player<E> = <<E as Engine>::Data as Data>::Player;
@@ -27,7 +25,6 @@ pub trait Data: Copy {
     type Player: Copy + PartialEq;
     fn kind(self) -> DataKind;
     fn player(self) -> Self::Player;
-    fn previous_player(self) -> Self::Player;
     fn is_active(self, player: Self::Player) -> bool;
     fn set_active(&mut self, player: Self::Player, new: bool);
     fn is_important(self) -> bool;
@@ -37,7 +34,7 @@ pub trait Data: Copy {
 
     fn cross_out(&mut self, player: Self::Player);
     fn fill(&mut self, player: Self::Player);
-    fn remove_fill(&mut self);
+    fn remove_fill(&mut self, player: Self::Player);
     fn remove_cross(&mut self);
 }
 #[derive(PartialEq)]
@@ -53,6 +50,7 @@ pub enum EngineError {
     DoubleFill,
     BorderHit,
     OutOfReach,
+    EmptyCancel,
 }
 
 #[cfg(test)]

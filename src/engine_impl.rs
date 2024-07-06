@@ -16,45 +16,64 @@ pub fn make_move<E: Engine>(
             *engine.crosses_counter(player) += 1;
             *engine.moves_counter(player) -= 1;
             data.set_important(activate_around(engine, index, player));
-            engine.set(index, data);
         }
         DataKind::Cross => {
             if data.player() == player {
                 return Err(EngineError::SelfFill);
             }
             if data.is_active(player) {
-                let is_important = data.is_important();
+                let was_important = data.is_important();
                 let previous_player = data.player();
                 data.fill(player);
-                engine.set(index, data);
                 *engine.moves_counter(player) -= 1;
                 *engine.crosses_counter(previous_player) -= 1;
-                // firstly we are killing adjacent filled cells, if cross was important
-                // if we cant find another cross
-                if is_important {
-                    deactivate_filled_around(engine, index, previous_player)
-                }
-                // secondly we deactivating other cells
-                deactivate_remaining_around(engine, index, previous_player);
+                engine.set(index, data);
+                deactivate_around(engine, index, previous_player, was_important);
                 data.set_important(activate_around(engine, index, player));
             }
         }
         DataKind::Filled => return Err(EngineError::DoubleFill),
         DataKind::Border => return Err(EngineError::BorderHit),
     };
-    return Ok(());
+    engine.set(index, data);
+    Ok(())
 }
-pub fn cancel_move<E: Engine>(_engine: &mut E, _index: E::Index) -> Result<(), EngineError> {
-    unimplemented!()
-}
-pub fn init<E: Engine>(_engine: &mut E) {
-    unimplemented!()
+pub fn cancel_move<E: Engine>(
+    engine: &mut E,
+    index: E::Index,
+    player: Player<E>,
+) -> Result<(), EngineError> {
+    let mut data = engine.get(index);
+    match data.kind() {
+        DataKind::Empty => return Err(EngineError::EmptyCancel),
+        DataKind::Cross => {
+            let was_important = data.is_important();
+            let previous_player = data.player();
+            data.remove_cross();
+            *engine.crosses_counter(previous_player) -= 1;
+            *engine.moves_counter(previous_player) += 1;
+            engine.set(index, data);
+            deactivate_around(engine, index, previous_player, was_important);
+        }
+        DataKind::Filled => {
+            let was_important = data.is_important();
+            let previous_player = data.player();
+            data.remove_fill(player);
+            *engine.moves_counter(previous_player) += 1;
+            *engine.crosses_counter(player) += 1;
+            engine.set(index, data);
+            deactivate_around(engine, index, previous_player, was_important);
+            data.set_important(activate_around(engine, index, player));
+        }
+        DataKind::Border => return Err(EngineError::BorderHit),
+    }
+    engine.set(index, data);
+    Ok(())
 }
 /// Activates cells around given index. Revives filled cells.
-/// It's fine to `set` cell after call to this function contrary to
-/// `deactivate_around`, which requires to `set` new state before call.
+/// It's fine to `set` cell only after call to this function.
 #[must_use]
-fn activate_around<E: Engine>(engine: &mut E, index: E::Index, player: Player<E>) -> bool {
+pub fn activate_around<E: Engine>(engine: &mut E, index: E::Index, player: Player<E>) -> bool {
     let mut is_special = false;
     for adjacent_index in engine.adjacent(index) {
         let mut adjacent_data = engine.get(adjacent_index);
@@ -81,6 +100,19 @@ fn activate_around<E: Engine>(engine: &mut E, index: E::Index, player: Player<E>
         engine.set(adjacent_index, adjacent_data);
     }
     return is_special;
+}
+/// Deactivates cells around given index. Kills filled cells.
+/// Requires to `set` new state before calling.
+fn deactivate_around<E: Engine>(
+    engine: &mut E,
+    index: E::Index,
+    player: Player<E>,
+    was_important: bool,
+) {
+    if is_important {
+        deactivate_filled_around(engine, index, previous_player)
+    }
+    deactivate_remaining_around(engine, index, previous_player);
 }
 /// Kills filled cells around index.
 /// Requires to `set` new state before calling.
