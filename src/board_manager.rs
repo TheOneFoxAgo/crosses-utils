@@ -111,7 +111,7 @@ pub fn activate_around<M: BoardManager>(
     index: M::Index,
     player: Player<M>,
 ) -> bool {
-    let mut is_special = false;
+    let mut is_important = false;
     for adjacent_index in manager.adjacent(index) {
         let mut adjacent_cell = manager.get(adjacent_index);
         match adjacent_cell.kind() {
@@ -128,7 +128,7 @@ pub fn activate_around<M: BoardManager>(
                     manager.revive(adjacent_index, |manager, i| {
                         revive_strategy(manager, i, player)
                     });
-                    is_special = true;
+                    is_important = true;
                     adjacent_cell.set_important(true);
                 }
             }
@@ -136,7 +136,7 @@ pub fn activate_around<M: BoardManager>(
         }
         manager.set(adjacent_index, adjacent_cell);
     }
-    return is_special;
+    is_important
 }
 /// Deactivates cells around given index. Kills filled cells.
 /// Requires to `set` new state before calling.
@@ -236,23 +236,21 @@ fn is_activated<M: BoardManager>(manager: &mut M, index: M::Index, player: Playe
         .adjacent(index)
         .into_iter()
         .map(|i| manager.get(i))
-        .find(|d| match d.kind() {
+        .any(|d| match d.kind() {
             CellKind::Cross => d.player() == player,
             CellKind::Filled => d.player() == player && d.is_alive(),
             _ => false,
         })
-        .is_some()
 }
 fn is_paired<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) -> bool {
     manager
         .adjacent(index)
         .into_iter()
         .map(|i| manager.get(i))
-        .find(|d| match d.kind() {
+        .any(|d| match d.kind() {
             CellKind::Cross | CellKind::Filled => d.player() == player && d.is_important(),
             _ => false,
         })
-        .is_some()
 }
 fn revive_strategy<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) {
     let mut cell = manager.get(index);
