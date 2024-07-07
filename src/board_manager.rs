@@ -12,7 +12,7 @@ pub trait BoardManager: Sized {
     fn make_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), EngineError> {
         let mut cell = self.get(index);
         match cell.kind() {
-            DataKind::Empty => {
+            CellKind::Empty => {
                 if !cell.is_active(player) {
                     return Err(EngineError::OutOfReach);
                 }
@@ -21,7 +21,7 @@ pub trait BoardManager: Sized {
                 *self.moves_counter(player) -= 1;
                 cell.set_important(activate_around(self, index, player));
             }
-            DataKind::Cross => {
+            CellKind::Cross => {
                 if cell.player() == player {
                     return Err(EngineError::SelfFill);
                 }
@@ -36,8 +36,8 @@ pub trait BoardManager: Sized {
                     cell.set_important(activate_around(self, index, player));
                 }
             }
-            DataKind::Filled => return Err(EngineError::DoubleFill),
-            DataKind::Border => return Err(EngineError::BorderHit),
+            CellKind::Filled => return Err(EngineError::DoubleFill),
+            CellKind::Border => return Err(EngineError::BorderHit),
         };
         self.set(index, cell);
         Ok(())
@@ -45,8 +45,8 @@ pub trait BoardManager: Sized {
     fn cancel_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), EngineError> {
         let mut cell = self.get(index);
         match cell.kind() {
-            DataKind::Empty => return Err(EngineError::EmptyCancel),
-            DataKind::Cross => {
+            CellKind::Empty => return Err(EngineError::EmptyCancel),
+            CellKind::Cross => {
                 let was_important = cell.is_important();
                 let previous_player = cell.player();
                 cell.remove_cross();
@@ -55,7 +55,7 @@ pub trait BoardManager: Sized {
                 self.set(index, cell);
                 deactivate_around(self, index, previous_player, was_important);
             }
-            DataKind::Filled => {
+            CellKind::Filled => {
                 let was_important = cell.is_important();
                 let previous_player = cell.player();
                 cell.remove_fill(player);
@@ -64,8 +64,9 @@ pub trait BoardManager: Sized {
                 self.set(index, cell);
                 deactivate_around(self, index, previous_player, was_important);
                 cell.set_important(activate_around(self, index, player));
+                restore_cross_activity(self, index, &mut cell);
             }
-            DataKind::Border => return Err(EngineError::BorderHit),
+            CellKind::Border => return Err(EngineError::BorderHit),
         }
         self.set(index, cell);
         Ok(())
@@ -74,7 +75,7 @@ pub trait BoardManager: Sized {
 pub type Player<E> = <<E as BoardManager>::Cell as Cell>::Player;
 pub trait Cell: Copy {
     type Player: Copy + PartialEq;
-    fn kind(self) -> DataKind;
+    fn kind(self) -> CellKind;
     fn player(self) -> Self::Player;
     fn is_active(self, player: Self::Player) -> bool;
     fn set_active(&mut self, player: Self::Player, new: bool);
@@ -89,7 +90,7 @@ pub trait Cell: Copy {
     fn remove_cross(&mut self);
 }
 #[derive(PartialEq)]
-pub enum DataKind {
+pub enum CellKind {
     Empty,
     Cross,
     Filled,
@@ -114,15 +115,15 @@ pub fn activate_around<M: BoardManager>(
     for adjacent_index in manager.adjacent(index) {
         let mut adjacent_cell = manager.get(adjacent_index);
         match adjacent_cell.kind() {
-            DataKind::Empty => {
+            CellKind::Empty => {
                 try_activate(manager, &mut adjacent_cell, player);
             }
-            DataKind::Cross => {
+            CellKind::Cross => {
                 if adjacent_cell.player() != player {
                     try_activate(manager, &mut adjacent_cell, player);
                 }
             }
-            DataKind::Filled => {
+            CellKind::Filled => {
                 if adjacent_cell.player() == player && !adjacent_cell.is_alive() {
                     manager.revive(adjacent_index, |manager, i| {
                         revive_strategy(manager, i, player)
@@ -155,7 +156,7 @@ fn deactivate_around<M: BoardManager>(
 fn deactivate_filled_around<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) {
     for adjacent_index in manager.adjacent(index) {
         let mut adjacent_cell = manager.get(adjacent_index);
-        if adjacent_cell.kind() == DataKind::Filled
+        if adjacent_cell.kind() == CellKind::Filled
             && adjacent_cell.player() == player
             && adjacent_cell.is_important()
         {
@@ -186,12 +187,12 @@ fn deactivate_remaining_around<M: BoardManager>(
     for adjacent_index in manager.adjacent(index) {
         let mut adjacent_cell = manager.get(adjacent_index);
         match adjacent_cell.kind() {
-            DataKind::Empty => {
+            CellKind::Empty => {
                 if !is_activated(manager, adjacent_index, player) {
                     try_deactivate(manager, &mut adjacent_cell, player);
                 }
             }
-            DataKind::Cross => {
+            CellKind::Cross => {
                 let adjacent_player = adjacent_cell.player();
                 if adjacent_player != player && !is_activated(manager, adjacent_index, player) {
                     try_deactivate(manager, &mut adjacent_cell, player);
@@ -202,6 +203,20 @@ fn deactivate_remaining_around<M: BoardManager>(
         manager.set(adjacent_index, adjacent_cell);
     }
 }
+fn restore_cross_activity<M: BoardManager>(manager: &mut M, index: M::Index, cell: &mut M::Cell) {
+    for adjacent_index in manager.adjacent(index) {
+        let adjacent_cell = manager.get(adjacent_index);
+        let adjacent_kind = adjacent_cell.kind();
+        if adjacent_kind == CellKind::Cross
+            || (adjacent_kind == CellKind::Filled && adjacent_cell.is_alive())
+        {
+            let adjacent_player = adjacent_cell.player();
+            if adjacent_player != cell.player() {
+                cell.set_active(adjacent_player, true)
+            }
+        }
+    }
+}
 fn mark_adjacent_as_important<M: BoardManager>(
     manager: &mut M,
     index: M::Index,
@@ -209,7 +224,7 @@ fn mark_adjacent_as_important<M: BoardManager>(
 ) {
     if let Some(adjacent_index) = manager.adjacent(index).into_iter().find(|i| {
         let d = manager.get(*i);
-        d.kind() == DataKind::Filled && d.player() == player
+        d.kind() == CellKind::Filled && d.player() == player
     }) {
         let mut adjacent_cell = manager.get(adjacent_index);
         adjacent_cell.set_important(true);
@@ -222,8 +237,8 @@ fn is_activated<M: BoardManager>(manager: &mut M, index: M::Index, player: Playe
         .into_iter()
         .map(|i| manager.get(i))
         .find(|d| match d.kind() {
-            DataKind::Cross => d.player() == player,
-            DataKind::Filled => d.player() == player && d.is_alive(),
+            CellKind::Cross => d.player() == player,
+            CellKind::Filled => d.player() == player && d.is_alive(),
             _ => false,
         })
         .is_some()
@@ -234,7 +249,7 @@ fn is_paired<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M
         .into_iter()
         .map(|i| manager.get(i))
         .find(|d| match d.kind() {
-            DataKind::Cross | DataKind::Filled => d.player() == player && d.is_important(),
+            CellKind::Cross | CellKind::Filled => d.player() == player && d.is_important(),
             _ => false,
         })
         .is_some()
@@ -242,15 +257,15 @@ fn is_paired<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M
 fn revive_strategy<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) {
     let mut cell = manager.get(index);
     match cell.kind() {
-        DataKind::Empty => {
+        CellKind::Empty => {
             try_activate(manager, &mut cell, player);
         }
-        DataKind::Cross => {
+        CellKind::Cross => {
             if cell.player() != player {
                 try_activate(manager, &mut cell, player);
             }
         }
-        DataKind::Filled => {
+        CellKind::Filled => {
             if cell.player() == player {
                 cell.set_alive(true)
             }
@@ -262,17 +277,17 @@ fn revive_strategy<M: BoardManager>(manager: &mut M, index: M::Index, player: Pl
 fn kill_strategy<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) {
     let mut cell = manager.get(index);
     match cell.kind() {
-        DataKind::Empty => {
+        CellKind::Empty => {
             if !is_activated(manager, index, player) {
                 try_deactivate(manager, &mut cell, player);
             }
         }
-        DataKind::Cross => {
+        CellKind::Cross => {
             if cell.player() != player && !is_activated(manager, index, player) {
                 try_deactivate(manager, &mut cell, player);
             }
         }
-        DataKind::Filled => {
+        CellKind::Filled => {
             if cell.player() == player {
                 cell.set_alive(false)
             }
