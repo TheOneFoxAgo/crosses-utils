@@ -1,5 +1,8 @@
 use core::ops::IndexMut;
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize};
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct PlayerManager<S: IndexMut<usize, Output = Option<LoseData>>>
 {
     remaining_moves: usize,
@@ -14,11 +17,13 @@ pub struct LoseData {
     move_idx: usize,
     remaining_moves: usize,
 }
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum GameState {
     Ongoing,
     Ended(GameOver)
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy )]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum GameOver {
     Win(usize),
     Draw,
