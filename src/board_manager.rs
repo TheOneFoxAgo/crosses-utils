@@ -4,9 +4,9 @@ pub trait BoardManager: Sized {
     fn get(&self, index: Self::Index) -> Self::Cell;
     fn set(&mut self, index: Self::Index, cell: Self::Cell);
     fn adjacent(&self, index: Self::Index) -> [Self::Index; 8];
-    fn revive(&mut self, index: Self::Index, revive: impl Fn(&mut Self, Self::Index));
-    fn kill(&mut self, index: Self::Index, kill: impl Fn(&mut Self, Self::Index));
-    fn search(&self, index: Self::Index) -> Option<Self::Index>;
+    fn revive(&mut self, index: Self::Index, revive: impl FnMut(&mut Self, Self::Index));
+    fn kill(&mut self, index: Self::Index, kill: impl FnMut(&mut Self, Self::Index));
+    fn search(&mut self, index: Self::Index) -> Option<Self::Index>;
     fn moves_counter(&mut self, player: Player<Self>) -> &mut usize;
     fn crosses_counter(&mut self, player: Player<Self>) -> &mut usize;
     fn make_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), EngineError> {
