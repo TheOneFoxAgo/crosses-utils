@@ -78,7 +78,8 @@ where
         }
         self.current_move_idx += 1;
         Ok(self.current_player_idx)
-    }pub fn previous_player(&mut self, previous_player_idx: usize) {
+    }
+    pub fn previous_player(&mut self, previous_player_idx: usize) {
         self.current_move_idx -= 1;
         if let Some(LoseData {
             move_idx: _,

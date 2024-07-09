@@ -1,14 +1,36 @@
+use core::ops::ControlFlow;
 pub trait BoardManager: Sized {
     type Index: Copy;
     type Cell: Cell;
     fn get(&self, index: Self::Index) -> Self::Cell;
     fn set(&mut self, index: Self::Index, cell: Self::Cell);
     fn adjacent(&self, index: Self::Index) -> [Self::Index; 8];
-    fn revive(&mut self, index: Self::Index, revive: impl FnMut(&mut Self, Self::Index));
-    fn kill(&mut self, index: Self::Index, kill: impl FnMut(&mut Self, Self::Index));
-    fn search(&mut self, index: Self::Index) -> Option<Self::Index>;
     fn moves_counter(&mut self, player: Player<Self>) -> &mut usize;
     fn crosses_counter(&mut self, player: Player<Self>) -> &mut usize;
+    fn traverse(
+        &mut self,
+        index: Self::Index,
+        action: impl FnMut(&mut Self, Self::Index) -> ControlFlow<Self::Index, ()>,
+    ) -> Option<Self::Index>;
+    fn revive(&mut self, index: Self::Index, mut revive: impl FnMut(&mut Self, Self::Index)) {
+        self.traverse(index, |manager, action| {
+            revive(manager, action);
+            ControlFlow::Continue(())
+        });
+    }
+    fn kill(&mut self, index: Self::Index, mut kill: impl FnMut(&mut Self, Self::Index)) {
+        self.traverse(index, |manager, action| {
+            kill(manager, action);
+            ControlFlow::Continue(())
+        });
+    }
+    fn search(
+        &mut self,
+        index: Self::Index,
+        search: impl FnMut(&mut Self, Self::Index) -> ControlFlow<Self::Index, ()>,
+    ) -> Option<Self::Index> {
+        self.traverse(index, search)
+    }
     fn make_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), EngineError> {
         let mut cell = self.get(index);
         match cell.kind() {
@@ -163,7 +185,9 @@ fn deactivate_filled_around<M: BoardManager>(manager: &mut M, index: M::Index, p
             && adjacent_cell.player() == player
             && adjacent_cell.is_important()
         {
-            if let Some(new_important_index) = manager.search(adjacent_index) {
+            if let Some(new_important_index) = manager.search(adjacent_index, |manager, i| {
+                search_strategy(manager, i, player)
+            }) {
                 let mut new_important = manager.get(new_important_index);
                 new_important.set_important(true);
                 manager.set(new_important_index, new_important);
@@ -296,6 +320,17 @@ fn kill_strategy<M: BoardManager>(manager: &mut M, index: M::Index, player: Play
         _ => {}
     }
     manager.set(index, cell);
+}
+fn search_strategy<M: BoardManager>(
+    manager: &mut M,
+    index: M::Index,
+    player: Player<M>,
+) -> ControlFlow<M::Index> {
+    let cell = manager.get(index);
+    match cell.kind() {
+        CellKind::Cross if cell.player() == player => ControlFlow::Break(index),
+        _ => ControlFlow::Continue(()),
+    }
 }
 /// Used with empty and cross cells. Activates cell and updates the counter
 /// if target cell isn't active.
