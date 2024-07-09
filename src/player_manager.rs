@@ -14,6 +14,7 @@ pub struct PlayerManager<S: IndexMut<usize, Output = Option<LoseData>>>
     pub current_move_idx: usize,
     pub game_result: GameState,
 }
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LoseData {
     pub move_idx: usize,
     pub remaining_moves: usize,
