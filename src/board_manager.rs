@@ -31,12 +31,12 @@ pub trait BoardManager: Sized {
     ) -> Option<Self::Index> {
         self.traverse(index, search)
     }
-    fn make_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), EngineError> {
+    fn make_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), BoardError> {
         let mut cell = self.get(index);
         match cell.kind() {
             CellKind::Empty => {
                 if !cell.is_active(player) {
-                    return Err(EngineError::OutOfReach);
+                    return Err(BoardError::OutOfReach);
                 }
                 cell.cross_out(player);
                 *self.crosses_counter(player) += 1;
@@ -45,7 +45,7 @@ pub trait BoardManager: Sized {
             }
             CellKind::Cross => {
                 if cell.player() == player {
-                    return Err(EngineError::SelfFill);
+                    return Err(BoardError::SelfFill);
                 }
                 if cell.is_active(player) {
                     let was_important = cell.is_important();
@@ -58,16 +58,16 @@ pub trait BoardManager: Sized {
                     cell.set_important(activate_around(self, index, player));
                 }
             }
-            CellKind::Filled => return Err(EngineError::DoubleFill),
-            CellKind::Border => return Err(EngineError::BorderHit),
+            CellKind::Filled => return Err(BoardError::DoubleFill),
+            CellKind::Border => return Err(BoardError::BorderHit),
         };
         self.set(index, cell);
         Ok(())
     }
-    fn cancel_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), EngineError> {
+    fn cancel_move(&mut self, index: Self::Index, player: Player<Self>) -> Result<(), BoardError> {
         let mut cell = self.get(index);
         match cell.kind() {
-            CellKind::Empty => return Err(EngineError::EmptyCancel),
+            CellKind::Empty => return Err(BoardError::EmptyCancel),
             CellKind::Cross => {
                 let was_important = cell.is_important();
                 let previous_player = cell.player();
@@ -88,7 +88,7 @@ pub trait BoardManager: Sized {
                 cell.set_important(activate_around(self, index, player));
                 restore_cross_activity(self, index, &mut cell);
             }
-            CellKind::Border => return Err(EngineError::BorderHit),
+            CellKind::Border => return Err(BoardError::BorderHit),
         }
         self.set(index, cell);
         Ok(())
@@ -121,7 +121,7 @@ pub enum CellKind {
 }
 #[cfg_attr(feature = "std", derive(Error))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum EngineError {
+pub enum BoardError {
     SelfFill,
     DoubleFill,
     BorderHit,

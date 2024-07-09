@@ -24,6 +24,7 @@ pub enum GameState {
     Ongoing,
     Ended(GameOver)
 }
+#[cfg_attr(feature = "std", derive(Error))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum GameOver {
