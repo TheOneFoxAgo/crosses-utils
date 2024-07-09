@@ -89,13 +89,16 @@ pub trait Cell: Copy {
     fn remove_fill(&mut self, player: Self::Player);
     fn remove_cross(&mut self);
 }
-#[derive(PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum CellKind {
     Empty,
     Cross,
     Filled,
     Border,
 }
+#[cfg_attr(feature = "std", derive(Error))]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum EngineError {
     SelfFill,
     DoubleFill,
