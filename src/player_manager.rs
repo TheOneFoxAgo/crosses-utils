@@ -6,17 +6,17 @@ use serde::{Serialize, Deserialize};
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct PlayerManager<S: IndexMut<usize, Output = Option<LoseData>>>
 {
-    remaining_moves: usize,
-    max_number_of_moves: usize,
-    current_player_idx: usize,
-    total_number_of_players: usize,
-    losers: S,
-    current_move_idx: usize,
-    game_result: GameState,
+    pub remaining_moves: usize,
+    pub max_number_of_moves: usize,
+    pub current_player_idx: usize,
+    pub total_number_of_players: usize,
+    pub losers: S,
+    pub current_move_idx: usize,
+    pub game_result: GameState,
 }
 pub struct LoseData {
-    move_idx: usize,
-    remaining_moves: usize,
+    pub move_idx: usize,
+    pub remaining_moves: usize,
 }
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
