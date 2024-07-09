@@ -1,4 +1,9 @@
-use core::ops::ControlFlow;
+use core::write;
+use core::{fmt::Display, ops::ControlFlow};
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 pub trait BoardManager: Sized {
     type Index: Copy;
     type Cell: Cell;
@@ -119,7 +124,6 @@ pub enum CellKind {
     Filled,
     Border,
 }
-#[cfg_attr(feature = "std", derive(Error))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum BoardError {
     SelfFill,
@@ -128,6 +132,19 @@ pub enum BoardError {
     OutOfReach,
     EmptyCancel,
 }
+impl Display for BoardError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            BoardError::SelfFill => write!(f, "can't fill cell with its own color"),
+            BoardError::DoubleFill => write!(f, "can't fill filled cell"),
+            BoardError::BorderHit => write!(f, "border hit"),
+            BoardError::OutOfReach => write!(f, "cell is out of reach"),
+            BoardError::EmptyCancel => write!(f, "can't cancel empty cell"),
+        }
+    }
+}
+#[cfg(feature = "std")]
+impl std::error::Error for BoardError {}
 /// Activates cells around given index. Revives filled cells.
 /// It's fine to `set` cell only after call to this function.
 #[must_use]

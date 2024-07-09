@@ -1,4 +1,4 @@
-use core::ops::IndexMut;
+use core::{fmt::Display, ops::IndexMut};
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
@@ -24,13 +24,23 @@ pub enum GameState {
     Ongoing,
     Ended(GameOver)
 }
-#[cfg_attr(feature = "std", derive(Error))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum GameOver {
     Win(usize),
     Draw,
 }
+impl Display for GameOver {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            GameOver::Win(winner) => write!(f, "game was won by player: {}", winner),
+            GameOver::Draw => write!(f, "game ended in a draw"),
+        }
+    }
+}
+#[cfg(feature = "std")]
+impl std::error::Error for GameOver {}
+
 impl<S> PlayerManager<S>
 where
     S: IndexMut<usize, Output = Option<LoseData>>,
