@@ -6,15 +6,16 @@ use serde::{Serialize, Deserialize};
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct PlayerManager<S: IndexMut<usize, Output = Option<LoseData>>>
 {
-    pub remaining_moves: usize,
-    pub max_number_of_moves: usize,
-    pub current_player_idx: usize,
-    pub total_number_of_players: usize,
-    pub losers: S,
-    pub current_move_idx: usize,
-    pub game_result: GameState,
+    remaining_moves: usize,
+    max_number_of_moves: usize,
+    current_player_idx: usize,
+    total_number_of_players: usize,
+    losers: S,
+    current_move_idx: usize,
+    game_result: GameState,
 }
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct LoseData {
     pub move_idx: usize,
     pub remaining_moves: usize,
@@ -46,6 +47,38 @@ impl<S> PlayerManager<S>
 where
     S: IndexMut<usize, Output = Option<LoseData>>,
 {
+    pub fn new(max_number_of_moves: usize, total_number_of_players: usize, losers: S) -> Self {
+        Self {
+            remaining_moves: max_number_of_moves,
+            max_number_of_moves,
+            current_player_idx: 0,
+            total_number_of_players,
+            losers,
+            current_move_idx: 0,
+            game_result: GameState::Ongoing,
+        }
+    }
+    pub fn remaining_moves(&self) -> usize {
+        self.remaining_moves
+    }
+    pub fn max_number_of_moves(&self) -> usize {
+        self.max_number_of_moves
+    }
+    pub fn current_player_idx(&self) -> usize {
+        self.current_player_idx
+    }
+    pub fn total_number_of_players(&self) -> usize {
+        self.total_number_of_players
+    }
+    pub fn losers(&self) -> &S {
+        &self.losers
+    }
+    pub fn current_move_idx(&self) -> usize {
+        self.current_move_idx
+    }
+    pub fn game_result(&self) -> GameState {
+        self.game_result
+    }
     pub fn next_player(
         &mut self,
         is_ran_out_of_moves: impl Fn(usize) -> bool,
