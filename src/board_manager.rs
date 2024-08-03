@@ -88,7 +88,12 @@ pub trait BoardManager: Sized {
                     *self.crosses_counter(previous_player) -= 1;
                     self.set(index, cell);
                     deactivate_around(self, index, previous_player, was_important);
-                    cell.set_important(activate_around(self, index, player));
+                    let mut important = false;
+                    if !is_alive_filled_around(self, index, player) {
+                        important = true;
+                        mark_adjacent_as_important(self, index, player, CellKind::Cross);
+                    }
+                    cell.set_important(activate_around(self, index, player) || important);
                 }
             }
             CellKind::Filled => return Err(BoardError::DoubleFill),
@@ -326,14 +331,18 @@ impl Display for BoardError {
 }
 #[cfg(feature = "std")]
 impl std::error::Error for BoardError {}
+/// Activates cell around given cell, if needed.
+/// If you need to restore activity of cells on the board,
+/// apply this function to every cell.
+pub fn init<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) {
+    if manager.get(index).kind() == CellKind::Cross {
+        let _ = activate_around(manager, index, player);
+    }
+}
 /// Activates cells around given index. Revives filled cells.
 /// It's fine to `set` cell only after call to this function.
 #[must_use]
-pub fn activate_around<M: BoardManager>(
-    manager: &mut M,
-    index: M::Index,
-    player: Player<M>,
-) -> bool {
+fn activate_around<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) -> bool {
     let mut is_important = false;
     for adjacent_index in M::adjacent(index) {
         let mut adjacent_cell = manager.get(adjacent_index);
@@ -374,6 +383,19 @@ fn deactivate_around<M: BoardManager>(
     }
     deactivate_remaining_around(manager, index, player);
 }
+fn is_alive_filled_around<M: BoardManager>(
+    manager: &mut M,
+    index: M::Index,
+    player: Player<M>,
+) -> bool {
+    M::adjacent(index)
+        .into_iter()
+        .map(|i| manager.get(i))
+        .any(|d| match d.kind() {
+            CellKind::Filled => d.player() == player && d.is_alive(),
+            _ => false,
+        })
+}
 /// Kills filled cells around index.
 /// Requires to `set` new state before calling.
 fn deactivate_filled_around<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) {
@@ -389,7 +411,7 @@ fn deactivate_filled_around<M: BoardManager>(manager: &mut M, index: M::Index, p
                 let mut new_important = manager.get(new_important_index);
                 new_important.set_important(true);
                 manager.set(new_important_index, new_important);
-                mark_adjacent_as_important(manager, new_important_index, player);
+                mark_adjacent_as_important(manager, new_important_index, player, CellKind::Filled);
             } else {
                 manager.kill(adjacent_index, |manager, i| {
                     kill_strategy(manager, i, player)
@@ -446,10 +468,11 @@ fn mark_adjacent_as_important<M: BoardManager>(
     manager: &mut M,
     index: M::Index,
     player: Player<M>,
+    target: CellKind,
 ) {
     if let Some(adjacent_index) = M::adjacent(index).into_iter().find(|i| {
         let d = manager.get(*i);
-        d.kind() == CellKind::Filled && d.player() == player
+        d.kind() == target && d.player() == player
     }) {
         let mut adjacent_cell = manager.get(adjacent_index);
         adjacent_cell.set_important(true);
