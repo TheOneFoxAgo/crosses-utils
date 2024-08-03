@@ -80,21 +80,22 @@ pub trait BoardManager: Sized {
                 if cell.player() == player {
                     return Err(BoardError::SelfFill);
                 }
-                if cell.is_active(player) {
-                    let was_important = cell.is_important();
-                    let previous_player = cell.player();
-                    cell.fill(player);
-                    *self.moves_counter(player) -= 1;
-                    *self.crosses_counter(previous_player) -= 1;
-                    self.set(index, cell);
-                    deactivate_around(self, index, previous_player, was_important);
-                    let mut important = false;
-                    if !is_alive_filled_around(self, index, player) {
-                        important = true;
-                        mark_adjacent_as_important(self, index, player, CellKind::Cross);
-                    }
-                    cell.set_important(activate_around(self, index, player) || important);
+                if !cell.is_active(player) {
+                    return Err(BoardError::OutOfReach);
                 }
+                let was_important = cell.is_important();
+                let previous_player = cell.player();
+                cell.fill(player);
+                *self.moves_counter(player) -= 1;
+                *self.crosses_counter(previous_player) -= 1;
+                self.set(index, cell);
+                deactivate_around(self, index, previous_player, was_important);
+                let mut important = false;
+                if !is_alive_filled_around(self, index, player) {
+                    important = true;
+                    mark_adjacent_as_important(self, index, player, CellKind::Cross);
+                }
+                cell.set_important(activate_around(self, index, player) || important);
             }
             CellKind::Filled => return Err(BoardError::DoubleFill),
             CellKind::Border => return Err(BoardError::BorderHit),
