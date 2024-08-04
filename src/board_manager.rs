@@ -26,8 +26,8 @@ pub trait BoardManager: Sized {
     /// assert_eq!(adjacent, [0, 1, 2, 3, 5, 6, 7, 8]);
     /// ```
     fn adjacent(index: Self::Index) -> impl IntoIterator<Item = Self::Index>;
-    fn moves_counter(&mut self, player: Player<Self>) -> &mut usize;
-    fn crosses_counter(&mut self, player: Player<Self>) -> &mut usize;
+    fn add_to_moves_counter(&mut self, player: Player<Self>, amount: isize);
+    fn add_to_crosses_counter(&mut self, player: Player<Self>, amount: isize);
     /// Generic traverse function. Revive, kill and search are derived from it.
     /// If you define revive, kill and search manually, traverse wouldn't be used.
     /// `index` is the index of filled cell, from where traverse should start.
@@ -72,8 +72,8 @@ pub trait BoardManager: Sized {
                     return Err(BoardError::OutOfReach);
                 }
                 cell.cross_out(player);
-                *self.crosses_counter(player) += 1;
-                *self.moves_counter(player) -= 1;
+                self.add_to_crosses_counter(player, 1);
+                self.add_to_moves_counter(player, -1);
                 cell.set_important(activate_around(self, index, player));
             }
             CellKind::Cross => {
@@ -86,8 +86,8 @@ pub trait BoardManager: Sized {
                 let was_important = cell.is_important();
                 let previous_player = cell.player();
                 cell.fill(player);
-                *self.moves_counter(player) -= 1;
-                *self.crosses_counter(previous_player) -= 1;
+                self.add_to_moves_counter(player, -1);
+                self.add_to_crosses_counter(previous_player, -1);
                 self.set(index, cell);
                 deactivate_around(self, index, previous_player, was_important);
                 let mut important = false;
@@ -119,8 +119,8 @@ pub trait BoardManager: Sized {
                 let was_important = cell.is_important();
                 let previous_player = cell.player();
                 cell.remove_cross();
-                *self.crosses_counter(previous_player) -= 1;
-                *self.moves_counter(previous_player) += 1;
+                self.add_to_crosses_counter(previous_player, -1);
+                self.add_to_moves_counter(previous_player, 1);
                 self.set(index, cell);
                 deactivate_around(self, index, previous_player, was_important);
             }
@@ -129,8 +129,8 @@ pub trait BoardManager: Sized {
                 let was_important = cell.is_important();
                 let previous_player = cell.player();
                 cell.remove_fill(player);
-                *self.moves_counter(previous_player) += 1;
-                *self.crosses_counter(player) += 1;
+                self.add_to_moves_counter(previous_player, 1);
+                self.add_to_crosses_counter(player, 1);
                 self.set(index, cell);
                 deactivate_around(self, index, previous_player, was_important);
                 cell.set_important(activate_around(self, index, player));
@@ -557,7 +557,7 @@ fn search_strategy<M: BoardManager>(
 fn try_activate<M: BoardManager>(manager: &mut M, cell: &mut M::Cell, player: Player<M>) {
     if !cell.is_active(player) {
         cell.set_active(player, true);
-        *manager.moves_counter(player) += 1;
+        manager.add_to_moves_counter(player, 1);
     }
 }
 /// Used with empty and cross cells. Deactivates cell and updates the counter
@@ -565,6 +565,6 @@ fn try_activate<M: BoardManager>(manager: &mut M, cell: &mut M::Cell, player: Pl
 fn try_deactivate<M: BoardManager>(manager: &mut M, cell: &mut M::Cell, player: Player<M>) {
     if cell.is_active(player) {
         cell.set_active(player, false);
-        *manager.moves_counter(player) -= 1;
+        manager.add_to_moves_counter(player, -1);
     }
 }
