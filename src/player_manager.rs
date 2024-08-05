@@ -6,7 +6,7 @@
 //!
 //! ```
 //! fn bad(
-//!     pm: &mut PlayerManager<Vec<Option<LoseData>>,
+//!     pm: &mut PlayerManager<Vec<Option<LoseData>>>,
 //!     bm: &mut impl BoardManager,
 //!     x: usize,
 //!     y: usize,
@@ -22,7 +22,7 @@
 //! The correct usage of this struct looks something like this:
 //! ```
 //! fn good(
-//!     pm: &mut PlayerManager<Vec<Option<LoseData>>,
+//!     pm: &mut PlayerManager<Vec<Option<LoseData>>>,
 //!     bm: &mut impl BoardManager,
 //!     x: usize,
 //!     y: usize,
