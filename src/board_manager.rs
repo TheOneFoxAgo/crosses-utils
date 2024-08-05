@@ -134,7 +134,6 @@ pub trait BoardManager: Sized {
                 self.set(index, cell);
                 deactivate_around(self, index, previous_player, was_important);
                 cell.set_important(activate_around(self, index, player));
-                restore_cross_activity(self, index, &mut cell);
             }
             CellKind::Border => return Err(BoardError::BorderHit),
         }
@@ -183,19 +182,9 @@ pub trait Cell: Copy {
     /// assert!(!cell.is_active(player));
     /// ```
     fn is_active(self, player: Self::Player) -> bool;
-    /// Sets the activity of cell for given player
-    /// This function is only called for cells of type
-    /// [`CellKind::Empty`] and [`CellKind::Cross`]
-    /// # Example
-    /// ```
-    /// let mut cell = /*some impl of Cell. Current type is Empty*/;
-    /// let player = /*some player*/;
-    /// cell.set_active(player, true);
-    /// assert!(cell.is_active(player));
-    /// cell.set_active(player, false);
-    /// assert!(!cell.is_active(player));
-    /// ```
-    fn set_active(&mut self, player: Self::Player, new: bool);
+    fn activate(&mut self, player: Self::Player) -> ActivationStatus;
+    fn deactivate(&mut self, player: Self::Player) -> ActivationStatus;
+    fn reset_activity(&mut self);
     /// Return the importance of cell.
     /// This function is only called for cells of type
     /// [`CellKind::Cross`] and [`CellKind::Filled`]
@@ -236,6 +225,8 @@ pub trait Cell: Copy {
     /// assert!(cell.is_alive());
     /// ```    
     fn set_alive(&mut self, new: bool);
+    fn is_overheated(self) -> bool;
+    fn set_overheat(&mut self, new: bool);
     /// Changes the type of cell to [`CellKind::Cross`].
     /// This function is only called for cells of type
     /// [`CellKind::Empty`]
@@ -310,6 +301,12 @@ pub enum CellKind {
     Cross,
     Filled,
     Border,
+}
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum ActivationStatus {
+    Regular,
+    Overheat,
+    Zero,
 }
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum BoardError {
@@ -435,34 +432,12 @@ fn deactivate_remaining_around<M: BoardManager>(
     for adjacent_index in M::adjacent(index) {
         let mut adjacent_cell = manager.get(adjacent_index);
         match adjacent_cell.kind() {
-            CellKind::Empty => {
-                if !is_activated(manager, adjacent_index, player) {
-                    try_deactivate(manager, &mut adjacent_cell, player);
-                }
-            }
-            CellKind::Cross => {
-                let adjacent_player = adjacent_cell.player();
-                if adjacent_player != player && !is_activated(manager, adjacent_index, player) {
-                    try_deactivate(manager, &mut adjacent_cell, player);
-                }
+            CellKind::Empty | CellKind::Cross => {
+                try_deactivate(manager, &mut adjacent_cell, adjacent_index, player);
             }
             _ => {}
         }
         manager.set(adjacent_index, adjacent_cell);
-    }
-}
-fn restore_cross_activity<M: BoardManager>(manager: &mut M, index: M::Index, cell: &mut M::Cell) {
-    for adjacent_index in M::adjacent(index) {
-        let adjacent_cell = manager.get(adjacent_index);
-        let adjacent_kind = adjacent_cell.kind();
-        if adjacent_kind == CellKind::Cross
-            || (adjacent_kind == CellKind::Filled && adjacent_cell.is_alive())
-        {
-            let adjacent_player = adjacent_cell.player();
-            if adjacent_player != cell.player() {
-                cell.set_active(adjacent_player, true)
-            }
-        }
     }
 }
 fn mark_adjacent_as_important<M: BoardManager>(
@@ -479,16 +454,6 @@ fn mark_adjacent_as_important<M: BoardManager>(
         adjacent_cell.set_important(true);
         manager.set(adjacent_index, adjacent_cell);
     }
-}
-fn is_activated<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) -> bool {
-    M::adjacent(index)
-        .into_iter()
-        .map(|i| manager.get(i))
-        .any(|d| match d.kind() {
-            CellKind::Cross => d.player() == player,
-            CellKind::Filled => d.player() == player && d.is_alive(),
-            _ => false,
-        })
 }
 fn is_paired<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) -> bool {
     M::adjacent(index)
@@ -522,15 +487,8 @@ fn revive_strategy<M: BoardManager>(manager: &mut M, index: M::Index, player: Pl
 fn kill_strategy<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) {
     let mut cell = manager.get(index);
     match cell.kind() {
-        CellKind::Empty => {
-            if !is_activated(manager, index, player) {
-                try_deactivate(manager, &mut cell, player);
-            }
-        }
-        CellKind::Cross => {
-            if cell.player() != player && !is_activated(manager, index, player) {
-                try_deactivate(manager, &mut cell, player);
-            }
+        CellKind::Empty | CellKind::Cross => {
+            try_deactivate(manager, &mut cell, index, player);
         }
         CellKind::Filled => {
             if cell.player() == player {
@@ -555,16 +513,51 @@ fn search_strategy<M: BoardManager>(
 /// Used with empty and cross cells. Activates cell and updates the counter
 /// if target cell isn't active.
 fn try_activate<M: BoardManager>(manager: &mut M, cell: &mut M::Cell, player: Player<M>) {
+    if !(cell.kind() == CellKind::Cross && player == cell.player())
+        && cell.activate(player) == ActivationStatus::Overheat
+    {
+        cell.set_overheat(true)
+    }
     if !cell.is_active(player) {
-        cell.set_active(player, true);
         manager.add_to_moves_counter(player, 1);
     }
 }
 /// Used with empty and cross cells. Deactivates cell and updates the counter
 /// if target cell is active.
-fn try_deactivate<M: BoardManager>(manager: &mut M, cell: &mut M::Cell, player: Player<M>) {
+fn try_deactivate<M: BoardManager>(
+    manager: &mut M,
+    cell: &mut M::Cell,
+    index: M::Index,
+    player: Player<M>,
+) {
     if cell.is_active(player) {
-        cell.set_active(player, false);
-        manager.add_to_moves_counter(player, -1);
+        if cell.deactivate(player) == ActivationStatus::Zero {
+            if cell.is_overheated() {
+                rebuild_activity(manager, index, cell);
+                if cell.is_active(player) {
+                    manager.add_to_moves_counter(player, -1);
+                }
+            } else {
+                manager.add_to_moves_counter(player, -1);
+            }
+        }
+    }
+}
+fn rebuild_activity<M: BoardManager>(manager: &mut M, index: M::Index, cell: &mut M::Cell) {
+    cell.reset_activity();
+    cell.set_overheat(false);
+    for adjacent_index in M::adjacent(index) {
+        let adjacent_cell = manager.get(adjacent_index);
+        let adjacent_kind = adjacent_cell.kind();
+        if adjacent_kind == CellKind::Cross
+            || (adjacent_kind == CellKind::Filled && adjacent_cell.is_alive())
+        {
+            let adjacent_player = adjacent_cell.player();
+            if !(cell.kind() == CellKind::Cross && adjacent_player == cell.player())
+                && cell.activate(adjacent_player) == ActivationStatus::Overheat
+            {
+                cell.set_overheat(true)
+            }
+        }
     }
 }
