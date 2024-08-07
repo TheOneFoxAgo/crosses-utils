@@ -466,38 +466,35 @@ fn is_paired<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M
 }
 fn revive_strategy<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) {
     let mut cell = manager.get(index);
-    match cell.kind() {
-        CellKind::Empty => {
-            try_activate(manager, &mut cell, player);
-        }
-        CellKind::Cross => {
-            if cell.player() != player {
-                try_activate(manager, &mut cell, player);
+    if let CellKind::Filled = cell.kind() {
+        if cell.player() == player {
+            cell.set_alive(true);
+            manager.set(index, cell);
+            for adjacent_index in M::adjacent(index) {
+                let mut adjacent_cell = manager.get(adjacent_index);
+                if let CellKind::Cross | CellKind::Empty = adjacent_cell.kind() {
+                    try_activate(manager, &mut adjacent_cell, player);
+                    manager.set(adjacent_index, adjacent_cell);
+                }
             }
         }
-        CellKind::Filled => {
-            if cell.player() == player {
-                cell.set_alive(true)
-            }
-        }
-        _ => {}
     }
-    manager.set(index, cell);
 }
 fn kill_strategy<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) {
     let mut cell = manager.get(index);
-    match cell.kind() {
-        CellKind::Empty | CellKind::Cross => {
-            try_deactivate(manager, &mut cell, index, player);
-        }
-        CellKind::Filled => {
-            if cell.player() == player {
-                cell.set_alive(false)
+    if let CellKind::Filled = cell.kind() {
+        if cell.player() == player {
+            cell.set_alive(false);
+            manager.set(index, cell);
+            for adjacent_index in M::adjacent(index) {
+                let mut adjacent_cell = manager.get(adjacent_index);
+                if let CellKind::Cross | CellKind::Empty = adjacent_cell.kind() {
+                    try_deactivate(manager, &mut adjacent_cell, adjacent_index, player);
+                    manager.set(adjacent_index, adjacent_cell);
+                }
             }
         }
-        _ => {}
     }
-    manager.set(index, cell);
 }
 fn search_strategy<M: BoardManager>(
     manager: &mut M,
@@ -513,13 +510,13 @@ fn search_strategy<M: BoardManager>(
 /// Used with empty and cross cells. Activates cell and updates the counter
 /// if target cell isn't active.
 fn try_activate<M: BoardManager>(manager: &mut M, cell: &mut M::Cell, player: Player<M>) {
+    if !cell.is_active(player) {
+        manager.add_to_moves_counter(player, 1);
+    }
     if !(cell.kind() == CellKind::Cross && player == cell.player())
         && cell.activate(player) == ActivationStatus::Overheat
     {
         cell.set_overheat(true)
-    }
-    if !cell.is_active(player) {
-        manager.add_to_moves_counter(player, 1);
     }
 }
 /// Used with empty and cross cells. Deactivates cell and updates the counter
@@ -531,6 +528,10 @@ fn try_deactivate<M: BoardManager>(
     player: Player<M>,
 ) {
     if cell.is_active(player) {
+        debug_assert!(
+            !(cell.kind() == CellKind::Cross && cell.player() == player),
+            "Cross shouldn't be active for its own player"
+        );
         if cell.deactivate(player) == ActivationStatus::Zero {
             if cell.is_overheated() {
                 rebuild_activity(manager, index, cell);
