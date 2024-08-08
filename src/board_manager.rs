@@ -345,13 +345,8 @@ fn activate_around<M: BoardManager>(manager: &mut M, index: M::Index, player: Pl
     for adjacent_index in M::adjacent(index) {
         let mut adjacent_cell = manager.get(adjacent_index);
         match adjacent_cell.kind() {
-            CellKind::Empty => {
+            CellKind::Empty | CellKind::Cross => {
                 try_activate(manager, &mut adjacent_cell, player);
-            }
-            CellKind::Cross => {
-                if adjacent_cell.player() != player {
-                    try_activate(manager, &mut adjacent_cell, player);
-                }
             }
             CellKind::Filled => {
                 if adjacent_cell.player() == player && !adjacent_cell.is_alive() {
@@ -398,7 +393,7 @@ fn is_alive_filled_around<M: BoardManager>(
 /// Requires to `set` new state before calling.
 fn deactivate_filled_around<M: BoardManager>(manager: &mut M, index: M::Index, player: Player<M>) {
     for adjacent_index in M::adjacent(index) {
-        let mut adjacent_cell = manager.get(adjacent_index);
+        let adjacent_cell = manager.get(adjacent_index);
         if adjacent_cell.kind() == CellKind::Filled
             && adjacent_cell.player() == player
             && adjacent_cell.is_important()
@@ -414,6 +409,7 @@ fn deactivate_filled_around<M: BoardManager>(manager: &mut M, index: M::Index, p
                 manager.kill(adjacent_index, |manager, i| {
                     kill_strategy(manager, i, player)
                 });
+                let mut adjacent_cell = manager.get(adjacent_index);
                 if !is_paired(manager, adjacent_index, player) {
                     adjacent_cell.set_important(false);
                     manager.set(adjacent_index, adjacent_cell);
