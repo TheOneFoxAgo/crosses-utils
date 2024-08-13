@@ -48,10 +48,10 @@ use core::{fmt::Display, ops::IndexMut};
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 /// Helper structure to track players' state during game.
 /// `S` - is type of storage. It can be Vec or simple array.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct PlayerManager<S: IndexMut<usize, Output = Option<LoseData>>>
 {
     remaining_moves: usize,
@@ -88,77 +88,6 @@ where
             current_move: 0,
             game_state: GameState::Ongoing,
         }
-    }
-    /// Returns the remaining number of current player's moves
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// assert_eq!(pm.remaining_moves(), 4);
-    /// pm.advance(|_| false, |_| false);
-    /// assert_eq!(pm.remaining_moves(), 3);
-    /// ```
-    pub fn remaining_moves(&self) -> usize {
-        self.remaining_moves
-    }
-    /// Returns max number of moves for the game
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// assert_eq!(pm.max_moves(), 4);
-    /// ```
-    pub fn max_moves(&self) -> usize {
-        self.max_moves
-    }
-    /// Returns the index of current player
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// assert_eq!(pm.current_player(), 0);
-    /// ```
-    pub fn current_player(&self) -> usize {
-        self.current_player
-    }
-    /// Return the initial number of players
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 3, [None;4]);
-    /// assert_eq!(pm.max_players(), 3);
-    /// ```
-    pub fn max_players(&self) -> usize {
-        self.max_players
-    }
-    /// Returns info about each player success.
-    /// `None` - player hasn't lost yet
-    /// `Some(lose_data)` - player has lost :(
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// pm.advance(|_| true, |_| true); // this will make all players loose. bad for them
-    /// assert_ne!(pm.losers[0], None);
-    /// ```
-    pub fn losers(&self) -> &S {
-        &self.losers
-    }
-    /// Return the current move index
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// assert_eq!(pm.current_move(), 0);
-    /// pm.advance(|_| false, |_| false);
-    /// assert_eq!(pm.current_move(), 1);
-    /// ```
-    pub fn current_move(&self) -> usize {
-        self.current_move
-    }
-    /// Returns state of the game. If it isn't `GameState::Ongoing`,
-    /// the manager will refuse to advance.
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// assert_eq!(pm.game_state(), GameState::Ongoing);
-    /// ```
-    pub fn game_state(&self) -> GameState {
-        self.game_state
     }
     /// Advances state of the game. It decrements number of moves,
     /// changes current_player if needed, etc.
@@ -295,6 +224,77 @@ where
             {self.max_moves} else {self.remaining_moves - 1};
         }
         self.current_player = player;
+    }
+    /// Returns the remaining number of current player's moves
+    /// # Example
+    /// ```
+    /// let pm = PlayerManager::new(4, 4, [None;4]);
+    /// assert_eq!(pm.remaining_moves(), 4);
+    /// pm.advance(|_| false, |_| false);
+    /// assert_eq!(pm.remaining_moves(), 3);
+    /// ```
+    pub fn remaining_moves(&self) -> usize {
+        self.remaining_moves
+    }
+    /// Returns max number of moves for the game
+    /// # Example
+    /// ```
+    /// let pm = PlayerManager::new(4, 4, [None;4]);
+    /// assert_eq!(pm.max_moves(), 4);
+    /// ```
+    pub fn max_moves(&self) -> usize {
+        self.max_moves
+    }
+    /// Returns the index of current player
+    /// # Example
+    /// ```
+    /// let pm = PlayerManager::new(4, 4, [None;4]);
+    /// assert_eq!(pm.current_player(), 0);
+    /// ```
+    pub fn current_player(&self) -> usize {
+        self.current_player
+    }
+    /// Return the initial number of players
+    /// # Example
+    /// ```
+    /// let pm = PlayerManager::new(4, 3, [None;4]);
+    /// assert_eq!(pm.max_players(), 3);
+    /// ```
+    pub fn max_players(&self) -> usize {
+        self.max_players
+    }
+    /// Returns info about each player success.
+    /// `None` - player hasn't lost yet
+    /// `Some(lose_data)` - player has lost :(
+    /// # Example
+    /// ```
+    /// let pm = PlayerManager::new(4, 4, [None;4]);
+    /// pm.advance(|_| true, |_| true); // this will make all players loose. bad for them
+    /// assert_ne!(pm.losers[0], None);
+    /// ```
+    pub fn losers(&self) -> &S {
+        &self.losers
+    }
+    /// Return the current move index
+    /// # Example
+    /// ```
+    /// let pm = PlayerManager::new(4, 4, [None;4]);
+    /// assert_eq!(pm.current_move(), 0);
+    /// pm.advance(|_| false, |_| false);
+    /// assert_eq!(pm.current_move(), 1);
+    /// ```
+    pub fn current_move(&self) -> usize {
+        self.current_move
+    }
+    /// Returns state of the game. If it isn't `GameState::Ongoing`,
+    /// the manager will refuse to advance.
+    /// # Example
+    /// ```
+    /// let pm = PlayerManager::new(4, 4, [None;4]);
+    /// assert_eq!(pm.game_state(), GameState::Ongoing);
+    /// ```
+    pub fn game_state(&self) -> GameState {
+        self.game_state
     }
     fn check_if_other_players_have_lost(
         &mut self, 
