@@ -1,44 +1,8 @@
-//! This module defines [`PlayerManager`] structure, which is designed to help with player state management.
+//! This module defines [`PlayerManager`] struct, which is designed to help with player state management.
 //! The main methods are [`advance`] and [`reverse`]. [`advance`] changes the state as it is expected after the player performs a move.
-//! It updates the counters, changes the player if necessary, and so on, the [`reverse`] method does the same thing,
-//! but in reverse as the name suggests. Since this structure deals only with player state and does not interact with the field,
-//! [`PlayerManager`] and [`BoardManager`] can become out of sync if used carelessly:
+//! It keeps track of current move of the game, remaining moves, changes the player if necessary, the [`reverse`] method does the same thing,
+//! but in reverse as the name suggests.
 //!
-//! ```
-//! fn bad(
-//!     pm: &mut PlayerManager<Vec<Option<LoseData>>>,
-//!     bm: &mut impl BoardManager,
-//!     x: usize,
-//!     y: usize,
-//! ) -> Result<(), Box<dyn Error>> {
-//!     let player = pm.current_player();
-//!     let f = |p| false; // Placeholder closure. Completely meaningless.
-//!     pm.advance(f, f); // state has changed
-//!     bm.make_move(x, y, player)?; // if returns Err, move wasn't done and we end up in incorrect state
-//!     Ok(()) // Nothing is ok!!!! It's totally wrong!!!
-//! }
-//! ```
-//!
-//! The correct usage of this struct looks something like this:
-//! ```
-//! fn good(
-//!     pm: &mut PlayerManager<Vec<Option<LoseData>>>,
-//!     bm: &mut impl BoardManager,
-//!     x: usize,
-//!     y: usize,
-//! ) -> Result<(), Box<dyn Error>> {
-//!     // first, we check if game has ended
-//!     if self.game_state() != GameState::Ongoing {
-//!         return Err("The game has already ended!!!")    
-//!     }
-//!     // Then we try to make move
-//!     bm.make_move(x, y, pm.current_player())?;
-//!     let f = |p| false; // Placeholder closure. Completely meaningless.
-//!     // And in the end we advance our state
-//!     pm.advance(f,f);
-//!     Ok(())
-//! }
-//! ```
 //! [`advance`]: PlayerManager::advance
 //! [`reverse`]: PlayerManager::reverse
 //! [`BoardManager`]: crate::board_manager::BoardManager
@@ -46,21 +10,20 @@
 use core::{fmt::Display, ops::IndexMut};
 
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Helper structure to track players' state during game.
 /// `S` - is type of storage. It can be Vec or simple array.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct PlayerManager<S: IndexMut<usize, Output = Option<LoseData>>>
-{
-    remaining_moves: usize,
-    max_moves: usize,
-    current_player: usize,
-    max_players: usize,
-    current_move: usize,
-    game_state: GameState,
-    losers: S,
+pub struct PlayerManager<S: IndexMut<usize, Output = Option<LoseData>>> {
+    pub remaining_moves: usize,
+    pub max_moves: usize,
+    pub current_player: usize,
+    pub max_players: usize,
+    pub current_move: usize,
+    pub game_state: GameState,
+    pub losers: S,
 }
 impl<S> PlayerManager<S>
 where
@@ -75,7 +38,8 @@ where
     /// loosers initially (All values are `None`).
     /// # Example
     /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
+    /// # use crosses_utils::player_manager::*;
+    /// let pm = PlayerManager::new(4, 4, [None; 4]);
     /// ```
     pub fn new(max_moves: usize, max_players: usize, losers: S) -> Self {
         debug_assert!((0..max_players).all(|i| losers[i] == None));
@@ -96,37 +60,40 @@ where
     /// loosers.
     /// # Panics
     /// Panics if the game is over.
-    ///
-    /// Attention! This function must be called only after checking game
-    /// state and trying to perform move.
-    /// Calling this before, can lead to incorrect state.
-    /// See [module level documentation](self) for more examples.
     /// # Example
     /// ```
-    /// fn make_move(
-    ///     pm: &mut PlayerManager<Vec<Option<LoseData>>,
-    ///     bm: &mut impl BoardManager,
-    ///     x: usize,
-    ///     y: usize,
-    ///     log: &mut Vec<(usize, uszie)>,
-    /// ) -> Result<(), Box<dyn Error>> {
-    ///     if self.game_state() != GameState::Ongoing {
-    ///         return Err("The game has already ended!!!")    
-    ///     }
-    ///
-    ///     bm.make_move(x, y, pm.current_player())?;
-    ///     let f = |p| false; // Placeholder closure. Completely meaningless.
-    ///     log.push((x, y));
-    ///     pm.advance(f, f);
-    ///     Ok(())
+    /// # use crosses_utils::player_manager::*;
+    /// let mut pm = PlayerManager::new(4, 2, [None; 2]);
+    /// assert_eq!(
+    ///     (
+    ///         pm.remaining_moves,
+    ///         pm.current_player,
+    ///         pm.current_move,
+    ///         pm.game_state,
+    ///     ),
+    ///     (4, 0, 0, GameState::Ongoing)
+    /// );
+    /// pm.advance(|_| false, |_| false);
+    /// assert_eq!(
+    ///     (pm.remaining_moves, pm.current_player, pm.current_move),
+    ///     (3, 0, 1)
+    /// );
+    /// for _ in 0..3 {
+    ///     pm.advance(|_| false, |_| false);
     /// }
+    /// assert_eq!(
+    ///     (pm.remaining_moves, pm.current_player, pm.current_move),
+    ///     (4, 1, 4)
+    /// );
+    /// pm.advance(|_| true, |_| false);
+    /// assert_eq!(pm.game_state, GameState::Ended(GameOver::Win(0)));
     /// ```
     pub fn advance(
         &mut self,
         is_ran_out_of_moves: impl Fn(usize) -> bool,
         is_ran_out_of_crosses: impl Fn(usize) -> bool,
     ) {
-        if self.game_state() != GameState::Ongoing {
+        if self.game_state != GameState::Ongoing {
             panic!("Game has already ended, can't advance further!")
         }
         self.remaining_moves -= 1;
@@ -172,30 +139,34 @@ where
     /// state of game_manager, so we must ask BoardManager for that.
     /// # Panics:
     /// if current_move is 0, the function will panic.
-    ///
-    /// Attention! This function must be called only after checking game
-    /// state and trying to cancell move.
-    /// Calling this before, can lead to incorrect state.
     /// # Example
     /// ```
-    /// fn cancel_move(
-    ///     pm: &mut PlayerManager<Vec<Option<LoseData>>,
-    ///     bm: &mut impl BoardManager,
-    ///     log: &mut Vec<(usize, uszie)>,
-    /// ) -> Result<(), Box<dyn Error>> {
-    ///     if pm.current_move() == 0 {
-    ///         return Err("The game hasn't started yet!!!")
-    ///     }
-    ///     let (x, y) = log[pm.current_move];
-    ///     let player = // some fancy way of determining player
-    ///     bm.cancel_move()?;
-    ///     pm.reverse(player);
-    ///     log.pop();
-    ///     Ok(())
-    /// }
+    /// # use crosses_utils::player_manager::*;
+    /// let mut pm = PlayerManager::new(4, 2, [None; 2]);
+    /// pm.advance(|_| true, |_| false);
+    /// assert_eq!(
+    ///     (
+    ///         pm.remaining_moves,
+    ///         pm.current_player,
+    ///         pm.current_move,
+    ///         pm.game_state,
+    ///     ),
+    ///     (3, 0, 1, GameState::Ended(GameOver::Win(1)))
+    /// );
+    /// pm.reverse(0);
+    /// assert_eq!(
+    ///     (
+    ///         pm.remaining_moves,
+    ///         pm.current_player,
+    ///         pm.current_move,
+    ///         pm.game_state,
+    ///     ),
+    ///     (4, 0, 0, GameState::Ongoing)
+    /// );
     /// ```
     pub fn reverse(&mut self, player: usize) {
         self.current_move -= 1;
+        self.game_state = GameState::Ongoing;
         if let Some(LoseData {
             move_index: _,
             remaining_moves,
@@ -204,14 +175,14 @@ where
             self.remaining_moves = remaining_moves;
             let mut loser_idx = player;
             loop {
-                if matches!(
-                    self.losers[loser_idx],
-                    Some(LoseData {
-                        move_index, 
-                        remaining_moves: _
-                    }) if move_index == self.current_move )
+                if let Some(LoseData {
+                    move_index,
+                    remaining_moves: _,
+                }) = self.losers[loser_idx]
                 {
-                    self.losers[loser_idx] = None
+                    if move_index == self.current_move {
+                        self.losers[loser_idx] = None
+                    }
                 }
                 if loser_idx == self.current_player {
                     break;
@@ -219,85 +190,14 @@ where
                     loser_idx = (loser_idx + 1) % self.max_players;
                 }
             }
-        } else {
-            self.remaining_moves = if self.remaining_moves == 0 
-            {self.max_moves} else {self.remaining_moves - 1};
+        } else if self.remaining_moves == self.max_moves {
+            self.remaining_moves = 0
         }
         self.current_player = player;
-    }
-    /// Returns the remaining number of current player's moves
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// assert_eq!(pm.remaining_moves(), 4);
-    /// pm.advance(|_| false, |_| false);
-    /// assert_eq!(pm.remaining_moves(), 3);
-    /// ```
-    pub fn remaining_moves(&self) -> usize {
-        self.remaining_moves
-    }
-    /// Returns max number of moves for the game
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// assert_eq!(pm.max_moves(), 4);
-    /// ```
-    pub fn max_moves(&self) -> usize {
-        self.max_moves
-    }
-    /// Returns the index of current player
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// assert_eq!(pm.current_player(), 0);
-    /// ```
-    pub fn current_player(&self) -> usize {
-        self.current_player
-    }
-    /// Return the initial number of players
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 3, [None;4]);
-    /// assert_eq!(pm.max_players(), 3);
-    /// ```
-    pub fn max_players(&self) -> usize {
-        self.max_players
-    }
-    /// Returns info about each player success.
-    /// `None` - player hasn't lost yet
-    /// `Some(lose_data)` - player has lost :(
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// pm.advance(|_| true, |_| true); // this will make all players loose. bad for them
-    /// assert_ne!(pm.losers[0], None);
-    /// ```
-    pub fn losers(&self) -> &S {
-        &self.losers
-    }
-    /// Return the current move index
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// assert_eq!(pm.current_move(), 0);
-    /// pm.advance(|_| false, |_| false);
-    /// assert_eq!(pm.current_move(), 1);
-    /// ```
-    pub fn current_move(&self) -> usize {
-        self.current_move
-    }
-    /// Returns state of the game. If it isn't `GameState::Ongoing`,
-    /// the manager will refuse to advance.
-    /// # Example
-    /// ```
-    /// let pm = PlayerManager::new(4, 4, [None;4]);
-    /// assert_eq!(pm.game_state(), GameState::Ongoing);
-    /// ```
-    pub fn game_state(&self) -> GameState {
-        self.game_state
+        self.remaining_moves += 1;
     }
     fn check_if_other_players_have_lost(
-        &mut self, 
+        &mut self,
         check_all: bool,
         is_ran_out_of_moves: impl Fn(usize) -> bool,
         is_ran_out_of_crosses: impl Fn(usize) -> bool,
@@ -307,15 +207,13 @@ where
             let not_loser_idx = (self.current_player + delta) % self.max_players;
             if self.losers[not_loser_idx].is_none() {
                 {
-                    if is_ran_out_of_crosses(not_loser_idx)
-                    {
+                    if is_ran_out_of_crosses(not_loser_idx) {
                         self.losers[not_loser_idx] = Some(LoseData {
                             move_index: self.current_move,
                             remaining_moves: 0,
                         });
                         maybe_not_losers -= 1;
-                    } else if is_ran_out_of_moves(not_loser_idx)
-                    {
+                    } else if is_ran_out_of_moves(not_loser_idx) {
                         if maybe_not_losers > 1 {
                             self.losers[not_loser_idx] = Some(LoseData {
                                 move_index: self.current_move,
@@ -360,7 +258,7 @@ pub struct LoseData {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum GameState {
     Ongoing,
-    Ended(GameOver)
+    Ended(GameOver),
 }
 /// GameOver options. Either `Win` or `Draw`
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
