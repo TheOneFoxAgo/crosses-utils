@@ -1,3 +1,5 @@
+//! Manager of players' data
+//!
 //! This module defines [`PlayerManager`] struct, which is designed to help with player state management.
 //! The main methods are [`advance`] and [`reverse`]. [`advance`] changes the state as it is expected after the player performs a move.
 //! It keeps track of current move of the game, remaining moves, changes the player if necessary, the [`reverse`] method does the same thing,
@@ -5,7 +7,6 @@
 //!
 //! [`advance`]: PlayerManager::advance
 //! [`reverse`]: PlayerManager::reverse
-//! [`BoardManager`]: crate::board_manager::BoardManager
 
 use core::{fmt::Display, ops::IndexMut};
 
@@ -253,18 +254,22 @@ pub struct LoseData {
     pub move_index: usize,
     pub remaining_moves: usize,
 }
-/// The state of the game. Either 'Ongoing' or 'Ended'
+/// The state of the game.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum GameState {
+    /// The game hasn't ended
     Ongoing,
+    /// The game has ended with win or draw
     Ended(GameOver),
 }
-/// GameOver options. Either `Win` or `Draw`
+/// GameOver options.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum GameOver {
+    /// The game has a winner
     Win(usize),
+    /// The game has ended with a draw
     Draw,
 }
 impl Display for GameOver {
