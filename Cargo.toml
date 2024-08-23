@@ -1,7 +1,10 @@
 [package]
 name = "crosses-utils"
 version = "0.1.0"
+authors = ["TheOneFoxAgo <nikitad2005@gmail.com>"]
 edition = "2021"
+include = ["LICENSE", "**/*.rs", "Cargo.toml"]
+rust-version = "1.61"
 
 [features]
 default = [ "serde" ]
