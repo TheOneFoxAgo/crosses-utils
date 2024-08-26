@@ -78,8 +78,8 @@ pub trait IbtsBoard: GameBoard {
 /// that belongs to chain that is being searched.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct SearchResult<I> {
-    filled: I,
-    cross: I,
+    pub filled: I,
+    pub cross: I,
 }
 
 fn revive_around<M: IbtsBoard + ?Sized>(manager: &mut M, index: M::Index, player: M::Player) {
